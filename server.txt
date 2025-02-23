@@ -1,0 +1,637 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+
+Additional Info:
+----------------
+
+================================================================
+Directory Structure
+================================================================
+src/
+  __tests__/
+    server.test.ts
+  utils/
+    game-messages.ts
+    room-status.ts
+    snake-messages.ts
+  room.ts
+  server.ts
+  start.ts
+jest.config.js
+package.json
+tsconfig.json
+
+================================================================
+Files
+================================================================
+
+================
+File: src/__tests__/server.test.ts
+================
+import WebSocket from 'ws';
+import { GameMessageType } from '../utils/game-messages';
+import { GameServer } from '../server';
+
+describe('WebSocket Server', () => {
+  let client: WebSocket;
+  let server: GameServer;
+  const PORT = 8080;
+  const SERVER_URL = `ws://localhost:${PORT}`;
+
+  beforeAll(() => {
+    server = new GameServer(PORT);
+  });
+
+  afterAll((done) => {
+    server.close();
+    done();
+  });
+
+  beforeEach((done) => {
+    // Create client and wait for connection
+    client = new WebSocket(SERVER_URL);
+    client.on('open', () => {
+      done();
+    });
+  });
+
+  afterEach((done) => {
+
+    if (client.readyState === WebSocket.OPEN) {
+      client.close();
+    }
+    done();
+  });
+
+  it('should connect successfully', () => {
+    // If we reach here, the beforeEach succeeded in connecting
+    expect(client.readyState).toBe(WebSocket.OPEN);
+  });
+
+  it('should receive error on invalid message', (done) => {
+    client.on('message', (message) => {
+      const response = JSON.parse(message.toString());
+      expect(response.type).toBe(GameMessageType.ERROR);
+      expect(response.data.code).toBe('INVALID_MESSAGE');
+      done();
+    });
+
+    client.send('invalid json');
+  });
+
+  it('should handle CREATE_ROOM message', (done) => {
+    client.on('message', (message) => {
+      const response = JSON.parse(message.toString());
+      expect(response.type).toBe(GameMessageType.ROOM_CREATED);
+      expect(response.data.roomId).toBeDefined();
+      expect(response.data.playerId).toBeDefined();
+      done();
+    });
+
+    client.send(JSON.stringify({
+      type: GameMessageType.CREATE_ROOM,
+      data: {}
+    }));
+  });
+});
+
+================
+File: src/utils/game-messages.ts
+================
+import { Vector2D } from "snake-game-engine";
+
+export enum GameMessageType {
+  // Room Management
+  CREATE_ROOM = 'create-room',
+  ROOM_CREATED = 'room-created',
+  JOIN_ROOM = 'join-room',
+  ROOM_JOINED = 'room-joined',
+  PLAYER_JOINED = 'player-joined',
+  PLAYER_LEFT = 'player-left',
+  ROOM_FULL = 'room-full',
+  GAME_CAN_START = 'game-can-start',
+  START_GAME = 'start-game',
+  GAME_STATE = 'game-state',
+  GAME_STATE_UPDATE = 'game-state-update',
+  REQUEST_GAME_STATE = 'request-game-state',
+  ERROR = 'error'
+}
+
+// Room constants
+export const ROOM_CONSTANTS = {
+  MAX_PLAYERS: 4,
+  MIN_PLAYERS_TO_START: 2
+} as const;
+
+// General game message interfaces
+export interface RoomCreatedMessage {
+  roomId: string;
+  playerId: string;
+}
+
+export interface JoinRoomMessage {
+  roomId: string;
+}
+
+export interface PlayerJoinedMessage {
+  playerId: string;
+  position: Vector2D;
+}
+
+export interface GameStateMessage {
+  players: { id: string; snake: Vector2D[] }[];
+  foodPosition: Vector2D;
+}
+
+export interface ErrorMessage {
+  code: string;
+  message: string;
+}
+
+================
+File: src/utils/room-status.ts
+================
+export enum RoomStatus {
+  WAITING = 'waiting',
+  READY = 'ready',
+  PLAYING = 'playing'
+}
+
+================
+File: src/utils/snake-messages.ts
+================
+import { Vector2D } from "snake-game-engine";
+
+export enum SnakeMessageType {
+  // Gameplay specific
+  PLAYER_POSITION_UPDATE = 'player-position-update',
+  FOOD_COLLECTED = 'food-collected',
+  PLAYER_DIED = 'player-died'
+}
+
+// Snake specific message interfaces
+export interface PlayerPositionMessage {
+  playerId: string;
+  positions: Vector2D[];
+}
+
+export interface FoodCollectedMessage {
+  collectedBy: string;
+  newFoodPosition: Vector2D;
+}
+
+export interface PlayerDiedMessage {
+  playerId: string;
+  finalPositions: Vector2D[];
+}
+
+================
+File: src/room.ts
+================
+import { WebSocket } from 'ws';
+import { ROOM_CONSTANTS } from './utils/game-messages';
+import { RoomStatus } from './utils/room-status';
+
+type MessageHandler = (ws: WebSocket, message: any) => void;
+
+export class Room {
+  private players: Map<string, WebSocket> = new Map();
+  private status: RoomStatus = RoomStatus.WAITING;
+  private messageHandlers: Set<MessageHandler> = new Set();
+
+  constructor(
+    private roomId: string,
+  ) { }
+
+  addMessageHandler(handler: MessageHandler) {
+    this.messageHandlers.add(handler);
+  }
+
+  removeMessageHandler(handler: MessageHandler) {
+    this.messageHandlers.delete(handler);
+  }
+
+  handleMessage(ws: WebSocket, message: any) {
+    this.messageHandlers.forEach(handler => handler(ws, message));
+  }
+
+  addPlayer(playerId: string, connection: WebSocket): boolean {
+    if (this.players.size >= ROOM_CONSTANTS.MAX_PLAYERS) {
+      return false;
+    }
+
+    this.players.set(playerId, connection);
+
+    if (this.players.size >= ROOM_CONSTANTS.MIN_PLAYERS_TO_START) {
+      this.status = RoomStatus.READY;
+    }
+
+    return true;
+  }
+
+  removePlayer(playerId: string) {
+    this.players.delete(playerId);
+
+    if (this.players.size < ROOM_CONSTANTS.MIN_PLAYERS_TO_START) {
+      this.status = RoomStatus.WAITING;
+    }
+  }
+
+  broadcast(message: any, excludePlayerId?: string) {
+    this.players.forEach((connection, playerId) => {
+      if (playerId !== excludePlayerId) {
+        connection.send(JSON.stringify(message));
+      }
+    });
+  }
+
+  // Helper methods
+  getId(): string {
+    return this.roomId;
+  }
+
+  getStatus(): RoomStatus {
+    return this.status;
+  }
+
+  getPlayerCount(): number {
+    return this.players.size;
+  }
+}
+
+================
+File: src/server.ts
+================
+import { WebSocket, WebSocketServer } from 'ws';
+import { GameMessageType } from './utils/game-messages';
+import { Room } from './room';
+import { RoomStatus } from './utils/room-status';
+import { SnakeMessageType } from './utils/snake-messages';
+import { GameStateMessage } from './utils/game-messages';
+
+export class GameServer {
+  private wss: WebSocketServer;
+  private connections: Map<WebSocket, string> = new Map(); // ws -> playerId
+  private rooms: Map<string, Room> = new Map(); // roomId -> Room
+  private playerRooms: Map<string, string> = new Map(); // playerId -> roomId
+  private gameStates: Map<string, GameStateMessage> = new Map(); // roomId -> GameState
+
+  constructor(port: number = 8080) {
+    this.wss = new WebSocketServer({ port });
+    this.setupWebSocketServer();
+  }
+
+  private setupWebSocketServer() {
+    this.wss.on('connection', (ws: WebSocket) => {
+      console.log('New client connected');
+
+      ws.on('message', (message: string) => {
+        try {
+          const parsedMessage = JSON.parse(message.toString());
+          this.handleMessage(ws, parsedMessage);
+        } catch (error) {
+          console.error('Error parsing message:', error);
+          this.sendError(ws, 'INVALID_MESSAGE', 'Invalid message format');
+        }
+      });
+
+      ws.on('close', () => {
+        const playerId = this.connections.get(ws);
+        if (playerId) {
+          this.handlePlayerDisconnect(ws, playerId);
+        }
+        this.connections.delete(ws);
+        console.log('Client disconnected');
+      });
+    });
+  }
+
+  private handleMessage(ws: WebSocket, message: any) {
+    const { type, data } = message;
+
+    switch (type) {
+      case GameMessageType.CREATE_ROOM:
+        this.handleCreateRoom(ws);
+        break;
+      case GameMessageType.JOIN_ROOM:
+        this.handleJoinRoom(ws, data);
+        break;
+      case GameMessageType.GAME_STATE_UPDATE:
+        this.handleGameStateUpdate(ws, data);
+        break;
+      // Forward game-related messages to room members
+      case SnakeMessageType.PLAYER_POSITION_UPDATE:
+      case SnakeMessageType.FOOD_COLLECTED:
+      case SnakeMessageType.PLAYER_DIED:
+        this.relayMessageToRoom(ws, message);
+        break;
+      default:
+        this.sendError(ws, 'UNKNOWN_MESSAGE', 'Unknown message type');
+    }
+  }
+
+  private handleCreateRoom(ws: WebSocket) {
+    const roomId = Math.random().toString(36).substring(2, 8).toUpperCase(); // Simple room code
+    const playerId = Math.random().toString(36).substring(2, 10); // Simple player id
+
+    const room = new Room(roomId);
+    this.rooms.set(roomId, room);
+
+    if (!room.addPlayer(playerId, ws)) {
+      this.rooms.delete(roomId);
+      return this.sendError(ws, 'ROOM_ERROR', 'Could not create room');
+    }
+
+    this.connections.set(ws, playerId);
+    this.playerRooms.set(playerId, roomId);
+
+    console.log('Room created, sending message to client');
+
+    ws.send(JSON.stringify({
+      type: GameMessageType.ROOM_CREATED,
+      data: {
+        roomId,
+        playerId
+      }
+    }));
+  }
+
+  private async handleJoinRoom(ws: WebSocket, data: { roomId: string }) {
+    const { roomId } = data;
+    const room = this.rooms.get(roomId);
+
+    if (!room) {
+      return this.sendError(ws, 'ROOM_NOT_FOUND', 'Room not found');
+    }
+
+    const playerId = Math.random().toString(36).substring(2, 10);
+
+    if (!room.addPlayer(playerId, ws)) {
+      return this.sendError(ws, 'ROOM_FULL', 'Room is full');
+    }
+
+    this.connections.set(ws, playerId);
+    this.playerRooms.set(playerId, roomId);
+
+    // Get current game state if room is already playing
+    if (room.getStatus() === RoomStatus.PLAYING) {
+      const gameState = this.gameStates.get(roomId);
+      if (gameState) {
+        ws.send(JSON.stringify({
+          type: GameMessageType.GAME_STATE,
+          data: gameState
+        }));
+      }
+    }
+
+    // Request game state from an existing player
+    const currentState = await this.requestGameState(room, playerId);
+    console.log(`Server sending game state to ${playerId}:`, currentState);
+    if (currentState) {
+      this.gameStates.set(roomId, currentState);
+
+      // Send state to the new player
+      ws.send(JSON.stringify({
+        type: GameMessageType.GAME_STATE,
+        data: currentState
+      }));
+    }
+
+    // Notify others in the room
+    room.broadcast({
+      type: GameMessageType.PLAYER_JOINED,
+      data: { playerId }
+    }, playerId); // Exclude the new player from this broadcast
+
+    // Send join confirmation to the new player
+    ws.send(JSON.stringify({
+      type: GameMessageType.ROOM_JOINED,
+      data: {
+        roomId,
+        playerId
+      }
+    }));
+
+    // If room is ready to start, notify everyone
+    if (room.getStatus() === RoomStatus.READY) {
+      room.broadcast({
+        type: GameMessageType.GAME_CAN_START,
+        data: { roomId }
+      });
+    }
+  }
+
+  private async requestGameState(room: Room, excludePlayerId: string): Promise<GameStateMessage | null> {
+    return new Promise((resolve) => {
+      let responded = false;
+      const timeout = setTimeout(() => {
+        console.log(`Server request game state timeout for ${excludePlayerId}`);
+        if (!responded) {
+          resolve(null);
+        }
+      }, 2000); // 1 second timeout
+
+      // Request state from any player except the new one
+      room.broadcast({
+        type: GameMessageType.REQUEST_GAME_STATE,
+        data: {}
+      }, excludePlayerId);
+
+      console.log(`Server requesting game state excluding ${excludePlayerId}`);
+
+      // Set up one-time handler for the response
+      const stateHandler = (ws: WebSocket, message: any) => {
+        console.log(`Server received game state update from ${excludePlayerId}:`, message);
+        if (message.type === GameMessageType.GAME_STATE_UPDATE) {
+          responded = true;
+          clearTimeout(timeout);
+          resolve(message.data);
+        }
+      };
+
+      // Remove handler after timeout
+      setTimeout(() => {
+        console.log(`Server removing message handler for ${excludePlayerId}`);
+        room.removeMessageHandler(stateHandler);
+      }, 2000);
+
+      room.addMessageHandler(stateHandler);
+    });
+  }
+
+  private handleGameStateUpdate(ws: WebSocket, state: GameStateMessage) {
+    const playerId = this.connections.get(ws);
+    if (!playerId) return;
+
+    const roomId = this.playerRooms.get(playerId);
+    if (!roomId) return;
+
+    this.gameStates.set(roomId, state);
+  }
+
+  private relayMessageToRoom(ws: WebSocket, message: any) {
+
+    const playerId = this.connections.get(ws);
+
+    // console.log(`Server relaying message from ${playerId}:`, message);
+
+    if (!playerId) return;
+
+    const roomId = this.playerRooms.get(playerId);
+    if (!roomId) return;
+
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    // Relay the message to all other players in the room
+    room.broadcast(message, playerId);
+  }
+
+  private handlePlayerDisconnect(ws: WebSocket, playerId: string) {
+    const roomId = this.playerRooms.get(playerId);
+    if (!roomId) return;
+
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    room.removePlayer(playerId);
+    this.playerRooms.delete(playerId);
+
+    // Notify others in the room
+    room.broadcast({
+      type: GameMessageType.PLAYER_LEFT,
+      data: { playerId }
+    });
+
+    // If room is empty, remove it
+    if (room.getPlayerCount() === 0) {
+      this.rooms.delete(roomId);
+    }
+  }
+
+  private sendError(ws: WebSocket, code: string, message: string) {
+    ws.send(JSON.stringify({
+      type: GameMessageType.ERROR,
+      data: { code, message }
+    }));
+  }
+
+  close() {
+    this.wss.close();
+  }
+}
+
+================
+File: src/start.ts
+================
+import { GameServer } from "./server";
+
+const server = new GameServer();
+console.log('WebSocket server is running on port 8080');
+
+================
+File: jest.config.js
+================
+module.exports = {
+  preset: "ts-jest",
+  testEnvironment: "node",
+  roots: ["<rootDir>/src"],
+  testMatch: ["**/__tests__/**/*.ts", "**/?(*.)+(spec|test).ts"],
+  transform: {
+    "^.+\\.ts$": "ts-jest",
+  },
+};
+
+================
+File: package.json
+================
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "ts-node src/start.ts",
+    "dev": "nodemon --exec ts-node src/start.ts",
+    "build": "tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^22.13.1",
+    "@types/ws": "^8.5.13",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.9",
+    "ts-jest": "^29.1.2"
+  }
+}
+
+================
+File: tsconfig.json
+================
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*"]
+}
+
+
+
+================================================================
+End of Codebase
+================================================================
