@@ -1,4 +1,14 @@
-import { Vector2D } from "snake-game-engine";
+import { WebSocket } from "ws";
+
+export type HandlerFunction = (ws: WebSocket, data?: any, message?: any) => void;
+export type RoomId = string;
+export type PlayerId = string;
+
+export enum RoomStatus {
+  WAITING = 'waiting',
+  READY = 'ready',
+  PLAYING = 'playing'
+}
 
 export enum GameMessageType {
   // Room Management
@@ -8,6 +18,7 @@ export enum GameMessageType {
   ROOM_JOINED = 'room-joined',
   PLAYER_JOINED = 'player-joined',
   PLAYER_LEFT = 'player-left',
+  PLAYER_DIED = 'player-died',
   ROOM_FULL = 'room-full',
   GAME_CAN_START = 'game-can-start',
   START_GAME = 'start-game',
@@ -33,14 +44,9 @@ export interface JoinRoomMessage {
   roomId: string;
 }
 
-export interface PlayerJoinedMessage {
-  playerId: string;
-  position: Vector2D;
-}
-
-export interface GameStateMessage {
-  players: { id: string; snake: Vector2D[] }[];
-  foodPosition: Vector2D;
+export interface GameStateMessage<P, S> {
+  players: P[];
+  state: S;
 }
 
 export interface ErrorMessage {

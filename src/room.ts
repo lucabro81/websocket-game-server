@@ -1,6 +1,5 @@
 import { WebSocket } from 'ws';
-import { ROOM_CONSTANTS } from './utils/game-messages';
-import { RoomStatus } from './utils/room-status';
+import { RoomStatus, ROOM_CONSTANTS } from './types';
 
 type MessageHandler = (ws: WebSocket, message: any) => void;
 

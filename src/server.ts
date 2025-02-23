@@ -1,20 +1,13 @@
 import { WebSocket, WebSocketServer } from 'ws';
-import { GameMessageType } from './utils/game-messages';
 import { Room } from './room';
-import { RoomStatus } from './utils/room-status';
-import { SnakeMessageType } from './utils/snake-messages';
-import { GameStateMessage } from './utils/game-messages';
+import { GameStateMessage, GameMessageType, PlayerId, RoomId, HandlerFunction, RoomStatus } from './types';
 
-export type HandlerFunction = (ws: WebSocket, data?: any, message?: any) => void;
-export type RoomId = string;
-export type PlayerId = string;
-
-export class GameServer {
+export class GameServer<P, S> {
   private wss: WebSocketServer;
   private connections: Map<WebSocket, PlayerId> = new Map(); // ws -> playerId
   private rooms: Map<RoomId, Room> = new Map(); // roomId -> Room
   private playerRooms: Map<PlayerId, RoomId> = new Map(); // playerId -> roomId
-  private gameStates: Map<RoomId, GameStateMessage> = new Map(); // roomId -> GameState
+  private gameStates: Map<RoomId, GameStateMessage<P, S>> = new Map(); // roomId -> GameState
   private gameMessagesMap: Map<string, HandlerFunction> = new Map();
 
   constructor(port: number = 8080) {
@@ -64,9 +57,7 @@ export class GameServer {
       room.handleMessage(ws, message);
       this.handleGameStateUpdate(ws, data);
     });
-    this.gameMessagesMap.set(SnakeMessageType.PLAYER_POSITION_UPDATE, this.relayMessageToRoom);
-    this.gameMessagesMap.set(SnakeMessageType.FOOD_COLLECTED, this.relayMessageToRoom);
-    this.gameMessagesMap.set(SnakeMessageType.PLAYER_DIED, this.relayMessageToRoom);
+    this.gameMessagesMap.set(GameMessageType.PLAYER_DIED, this.relayMessageToRoom);
   }
 
   addRelayMessageToRoom(type: string) {
@@ -86,37 +77,6 @@ export class GameServer {
     } else {
       this.sendError(ws, 'UNKNOWN_MESSAGE', 'Unknown message type');
     }
-
-    // switch (type) {
-    //   case GameMessageType.CREATE_ROOM:
-    //     this.handleCreateRoom(ws);
-    //     break;
-    //   case GameMessageType.JOIN_ROOM:
-    //     this.handleJoinRoom(ws, data);
-    //     break;
-    //   case GameMessageType.GAME_STATE_UPDATE:
-    //     const playerId = this.connections.get(ws);
-    //     if (!playerId) return;
-
-    //     const roomId = this.playerRooms.get(playerId);
-    //     if (!roomId) return;
-
-    //     const room = this.rooms.get(roomId);
-    //     if (!room) return;
-
-    //     // Add this to process room messages through handlers
-    //     room.handleMessage(ws, message);
-    //     this.handleGameStateUpdate(ws, data);
-    //     break;
-    //   // Forward game-related messages to room members
-    //   case SnakeMessageType.PLAYER_POSITION_UPDATE:
-    //   case SnakeMessageType.FOOD_COLLECTED:
-    //   case SnakeMessageType.PLAYER_DIED:
-    //     this.relayMessageToRoom(ws, message);
-    //     break;
-    //   default:
-    //     this.sendError(ws, 'UNKNOWN_MESSAGE', 'Unknown message type');
-    // }
   }
 
   private handleCreateRoom(ws: WebSocket) {
@@ -210,7 +170,7 @@ export class GameServer {
     }
   }
 
-  private async requestGameState(room: Room, excludePlayerId: string): Promise<GameStateMessage | null> {
+  private async requestGameState(room: Room, excludePlayerId: string): Promise<GameStateMessage<P, S> | null> {
     return new Promise((resolve) => {
       let responded = false;
       const timeout = setTimeout(() => {
@@ -247,7 +207,7 @@ export class GameServer {
     });
   }
 
-  private handleGameStateUpdate(ws: WebSocket, state: GameStateMessage) {
+  private handleGameStateUpdate(ws: WebSocket, state: GameStateMessage<P, S>) {
     const playerId = this.connections.get(ws);
     if (!playerId) return;
 
