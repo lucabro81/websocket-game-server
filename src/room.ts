@@ -1,5 +1,5 @@
 import { WebSocket } from 'ws';
-import { RoomStatus, ROOM_CONSTANTS } from './types';
+import { RoomStatus, ROOM_CONSTANTS } from './types.js';
 
 type MessageHandler = (ws: WebSocket, message: any) => void;
 

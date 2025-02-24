@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
-import { GameServer } from '../server';
-import { GameMessageType } from '../types';
+import { GameServer } from '../server.js';
+import { GameMessageType } from '../types.js';
 
 describe('WebSocket Server', () => {
   let client: WebSocket;

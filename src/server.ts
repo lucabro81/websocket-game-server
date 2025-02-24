@@ -1,6 +1,6 @@
 import { WebSocket, WebSocketServer } from 'ws';
-import { Room } from './room';
-import { GameStateMessage, GameMessageType, PlayerId, RoomId, HandlerFunction, RoomStatus } from './types';
+import { Room } from './room.js';
+import { GameStateMessage, GameMessageType, PlayerId, RoomId, HandlerFunction, RoomStatus } from './types.js';
 
 export class GameServer<P, S> {
   private wss: WebSocketServer;
@@ -33,7 +33,7 @@ export class GameServer<P, S> {
       ws.on('close', () => {
         const playerId = this.connections.get(ws);
         if (playerId) {
-          this.handlePlayerDisconnect(ws, playerId);
+          this.handlePlayerDisconnect(playerId);
         }
         this.connections.delete(ws);
         console.log('Client disconnected');
@@ -42,8 +42,12 @@ export class GameServer<P, S> {
   }
 
   private setupGameMessages() {
-    this.gameMessagesMap.set(GameMessageType.CREATE_ROOM, this.handleCreateRoom);
-    this.gameMessagesMap.set(GameMessageType.JOIN_ROOM, this.handleJoinRoom);
+    this.gameMessagesMap.set(GameMessageType.CREATE_ROOM, (ws) => {
+      this.handleCreateRoom(ws);
+    });
+    this.gameMessagesMap.set(GameMessageType.JOIN_ROOM, (ws, message) => {
+      this.handleJoinRoom(ws, message);
+    });
     this.gameMessagesMap.set(GameMessageType.GAME_STATE_UPDATE, (ws, message, data) => {
       const playerId = this.connections.get(ws);
       if (!playerId) return;
@@ -57,19 +61,27 @@ export class GameServer<P, S> {
       room.handleMessage(ws, message);
       this.handleGameStateUpdate(ws, data);
     });
-    this.gameMessagesMap.set(GameMessageType.PLAYER_DIED, this.relayMessageToRoom);
+    this.gameMessagesMap.set(GameMessageType.PLAYER_DIED, (ws, message) => {
+      this.relayMessageToRoom(ws, message);
+    });
   }
 
   addRelayMessageToRoom(type: string) {
-    this.gameMessagesMap.set(type, this.relayMessageToRoom);
+    this.gameMessagesMap.set(type, (ws, message) => {
+      this.relayMessageToRoom(ws, message);
+    });
   }
 
   addHandler(type: string, handler: HandlerFunction) {
-    this.gameMessagesMap.set(type, handler);
+    this.gameMessagesMap.set(type, (ws, message, data) => {
+      handler(ws, message, data);
+    });
   }
 
   private handleMessage(ws: WebSocket, message: any) {
     const { type, data } = message;
+
+    console.log('handleMessage', type, data);
 
     const handler = this.gameMessagesMap.get(type);
     if (handler) {
@@ -181,7 +193,7 @@ export class GameServer<P, S> {
 
 
       // Set up one-time handler for the response
-      const stateHandler = (ws: WebSocket, message: any) => {
+      const stateHandler = (message: any) => {
         if (message.type === GameMessageType.GAME_STATE_UPDATE) {
           responded = true;
           clearTimeout(timeout);
@@ -233,7 +245,7 @@ export class GameServer<P, S> {
     room.broadcast(message, playerId);
   }
 
-  private handlePlayerDisconnect(ws: WebSocket, playerId: string) {
+  private handlePlayerDisconnect(playerId: string) {
     const roomId = this.playerRooms.get(playerId);
     if (!roomId) return;
 

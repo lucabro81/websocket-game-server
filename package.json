@@ -2,7 +2,10 @@
   "name": "websocket-game-server",
   "version": "1.0.0",
   "description": "A simple game server using WebSocket",
-  "main": "./dist/main.js",
+  "author": "Luca Brognara",
+  "license": "ISC",
+  "private": false,
+  "main": "./dist/main.mjs",
   "types": "./dist/main.d.ts",
   "scripts": {
     "start": "ts-node src/start.ts",
@@ -19,8 +22,6 @@
     "game",
     "server"
   ],
-  "author": "Luca Brognara",
-  "license": "ISC",
   "dependencies": {
     "@types/node": "^22.13.1",
     "@types/ws": "^8.5.13",
@@ -35,5 +36,12 @@
     "ts-jest": "^29.1.2",
     "vite": "^6.0.5",
     "vite-plugin-dts": "^3.6.0"
-  }
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/main.js",
+      "require": "./dist/main.cjs"
+    }
+  },
+  "type": "module"
 }
