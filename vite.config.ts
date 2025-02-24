@@ -11,7 +11,7 @@ export default defineConfig({
       formats: ['es', 'umd']
     },
     sourcemap: process.env.KEEP_SOURCE_MAP === 'true',
-    minify: 'esbuild'
+    minify: 'esbuild',
   },
   plugins: [
     dts({
