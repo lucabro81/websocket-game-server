@@ -1,10 +1,10 @@
 import WebSocket from 'ws';
-import { GameMessageType } from '../utils/game-messages';
 import { GameServer } from '../server';
+import { GameMessageType } from '../types';
 
 describe('WebSocket Server', () => {
   let client: WebSocket;
-  let server: GameServer;
+  let server: GameServer<any, any>;
   const PORT = 8080;
   const SERVER_URL = `ws://localhost:${PORT}`;
 

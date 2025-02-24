@@ -1,9 +1,10 @@
 export { GameServer } from './server';
-export { GameStateMessage } from './types';
-export { RoomId, PlayerId } from './types';
-export { HandlerFunction } from './types';
-export { GameMessageType } from './types';
-export { RoomStatus } from './types';
-export { ROOM_CONSTANTS } from './types';
-export { RoomCreatedMessage } from './types';
-export { JoinRoomMessage } from './types';
+export type { GameStateMessage } from './types';
+export type { RoomId } from './types';
+export type { PlayerId } from './types';
+export type { HandlerFunction } from './types';
+export type { GameMessageType } from './types';
+export type { RoomStatus } from './types';
+export type { ROOM_CONSTANTS } from './types';
+export type { RoomCreatedMessage } from './types';
+export type { JoinRoomMessage } from './types';

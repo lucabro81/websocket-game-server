@@ -2,11 +2,14 @@
   "name": "websocket-game-server",
   "version": "1.0.0",
   "description": "A simple game server using WebSocket",
-  "main": "index.js",
+  "main": "./dist/main.js",
+  "types": "./dist/main.d.ts",
   "scripts": {
     "start": "ts-node src/start.ts",
     "dev": "nodemon --exec ts-node src/start.ts",
-    "build": "tsc",
+    "build": "tsc && vite build",
+    "publish:dry-run": "pnpm build && pnpm publish --dry-run",
+    "publish:prod": "pnpm build && pnpm publish",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
@@ -29,6 +32,8 @@
     "@types/jest": "^29.5.12",
     "jest": "^29.7.0",
     "nodemon": "^3.1.9",
-    "ts-jest": "^29.1.2"
+    "ts-jest": "^29.1.2",
+    "vite": "^6.0.5",
+    "vite-plugin-dts": "^3.6.0"
   }
 }

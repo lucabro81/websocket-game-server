@@ -189,10 +189,6 @@ export class GameServer<P, S> {
         }
       };
 
-
-
-
-
       // Remove handler after timeout
       setTimeout(() => {
         room.removeMessageHandler(stateHandler);

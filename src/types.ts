@@ -44,7 +44,7 @@ export interface JoinRoomMessage {
   roomId: string;
 }
 
-export interface GameStateMessage<P, S> {
+export interface GameStateMessage<P = any, S = any> {
   players: P[];
   state: S;
 }
