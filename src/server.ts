@@ -46,9 +46,9 @@ export class GameServer<P, S> {
       this.handleCreateRoom(ws);
     });
     this.gameMessagesMap.set(GameMessageType.JOIN_ROOM, (ws, message) => {
-      this.handleJoinRoom(ws, message);
+      this.handleJoinRoom(ws, message.data);
     });
-    this.gameMessagesMap.set(GameMessageType.GAME_STATE_UPDATE, (ws, message, data) => {
+    this.gameMessagesMap.set(GameMessageType.GAME_STATE_UPDATE, (ws, message) => {
       const playerId = this.connections.get(ws);
       if (!playerId) return;
 
@@ -59,7 +59,7 @@ export class GameServer<P, S> {
       if (!room) return;
 
       room.handleMessage(ws, message);
-      this.handleGameStateUpdate(ws, data);
+      this.handleGameStateUpdate(ws, message.data);
     });
     this.gameMessagesMap.set(GameMessageType.PLAYER_DIED, (ws, message) => {
       this.relayMessageToRoom(ws, message);
@@ -73,19 +73,17 @@ export class GameServer<P, S> {
   }
 
   addHandler(type: string, handler: HandlerFunction) {
-    this.gameMessagesMap.set(type, (ws, message, data) => {
-      handler(ws, message, data);
+    this.gameMessagesMap.set(type, (ws, message) => {
+      handler(ws, message);
     });
   }
 
   private handleMessage(ws: WebSocket, message: any) {
-    const { type, data } = message;
-
-    console.log('handleMessage', type, data);
+    const { type } = message;
 
     const handler = this.gameMessagesMap.get(type);
     if (handler) {
-      handler(ws, data, message);
+      handler(ws, message);
     } else {
       this.sendError(ws, 'UNKNOWN_MESSAGE', 'Unknown message type');
     }
@@ -230,8 +228,6 @@ export class GameServer<P, S> {
   private relayMessageToRoom(ws: WebSocket, message: any) {
 
     const playerId = this.connections.get(ws);
-
-    // console.log(`Server relaying message from ${playerId}:`, message);
 
     if (!playerId) return;
 

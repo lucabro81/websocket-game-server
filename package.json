@@ -1,6 +1,6 @@
 {
   "name": "websocket-game-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A simple game server using WebSocket",
   "author": "Luca Brognara",
   "license": "ISC",

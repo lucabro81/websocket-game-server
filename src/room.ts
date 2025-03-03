@@ -49,6 +49,7 @@ export class Room {
   broadcast(message: any, excludePlayerId?: string) {
     this.players.forEach((connection, playerId) => {
       if (playerId !== excludePlayerId) {
+        console.log(`Broadcasting message from ${excludePlayerId} to ${playerId}:`, message);
         connection.send(JSON.stringify(message));
       }
     });
